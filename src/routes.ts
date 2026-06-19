@@ -272,6 +272,24 @@ export const registerRoutes = async (app: FastifyInstance) => {
           file_url
         );
 
+        // Emit real-time event to socket.io room for this conversation so other clients receive it
+        try {
+          const io = (app as any).io;
+          if (io && conversation_id) {
+            io.to(`conversation:${conversation_id}`).emit('new_message', {
+              id: message.id,
+              conversation_id: conversation_id,
+              sender_id: message.sender_id,
+              text: message.text,
+              created_at: message.created_at,
+              sender_type: message.sender_type,
+            });
+            request.log.debug({ conversation_id }, `📣 Emitted new_message for conversation ${conversation_id}`);
+          }
+        } catch (emitErr) {
+          request.log.error({ err: emitErr }, 'Failed to emit socket event after message creation');
+        }
+
         return reply.status(201).send({ data: message });
       } catch (error) {
         request.log.error(error);
